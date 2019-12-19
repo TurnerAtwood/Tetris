@@ -17,7 +17,7 @@ PIECE_INDEX = [
 """
 
 PIECE_INDEX = [
-	[[1],[1],[1],[1]],
+	[[1,1,1,1]],
 	[[1,0,0],[1,1,1]],
 	[[0,0,1],[1,1,1]],
 	[[1,1],[1,1]],
@@ -95,6 +95,17 @@ class piece():
 		self.x = width//2
 		self.move(0)
 
+	def __repr__(self):
+		out = [[' ' for j in range(5)] for i in range(4)]
+		for i in range(len(self.grid)):
+			for j in range(self.width):
+				if self.grid[i][j]:
+					out[i][j+1] = FULL_CHR
+		out = "\n".join(["".join(i) for i in out])
+		return out
+		
+
+
 class Tetris_Engine():
 
 	def __init__(self, height=20, width=10):
@@ -108,6 +119,7 @@ class Tetris_Engine():
 		self.active_piece = self.bag.next()
 		self.next_piece = self.bag.next()
 		self.hold_piece = None
+		self.can_hold = True
 
 	### BOARD ###
 	def draw_piece(self,depth,ghost=False):
@@ -140,7 +152,7 @@ class Tetris_Engine():
 			try:
 				new_board = self.draw_piece(i, ghost)
 			except Exception as e:
-				pass
+				break
 		return new_board
 
 
@@ -163,23 +175,25 @@ class Tetris_Engine():
 	def rotate_piece(self):
 		self.active_piece.rotate()
 
-	def hold_piece(self):
-		self.active_piece
-		if self.hold_piece == None:
-			self.hold_piece = self.active_piece
-			self.get_new_piece()
-		else:
-			self.active_piece, self.hold_piece = self.hold_piece, self.active_piece
-
 	def get_new_piece(self):
 		self.active_piece = self.next_piece
 		self.next_piece = self.bag.next()
 
 	def hard_drop(self):
+		self.can_hold = True
 		self.board = self.drop_piece()
 		self.get_new_piece()
 		self.clear_full_lines()
 
+	def hold(self):
+		if not self.can_hold:
+			return
+		self.can_hold = False
+		if self.hold_piece == None:
+			self.hold_piece = self.active_piece
+			self.get_new_piece()
+		else:
+			self.hold_piece, self.active_piece = self.active_piece, self.hold_piece
 
 	### PIECE ###
 
@@ -200,11 +214,24 @@ def main(stdscr):
 	board_win = curses.newwin(height+1, width+2, 0, 0)
 	stdscr.refresh()
 
+	next_piece_win = curses.newwin(6,6,1,12)
+	hold_piece_win = curses.newwin(6,6,8,12)
+
+
 	while(True):
 		out_board = game.drop_piece(ghost=True)
 		print_screen(board_win, out_board)
 
-		stdscr.addstr(0,0,str(key))
+		next_piece_win.addstr(1,0, str(game.next_piece))
+		next_piece_win.box()
+		next_piece_win.refresh()
+
+		hold_piece_win.addstr(1,0, str(game.hold_piece))
+		hold_piece_win.box()
+		hold_piece_win.refresh()
+
+		stdscr.addstr(0,0,str(game.cleared))
+
 		key = stdscr.getch()
 		if key == curses.KEY_UP or key == curses.KEY_DOWN:
 			game.rotate_piece()
@@ -214,7 +241,9 @@ def main(stdscr):
 			game.move_piece_left()
 		elif key == ord(' '):
 			game.hard_drop()
-		if key == ord('q'):
+		elif key == ord('c'):
+			game.hold()
+		elif key == ord('q'):
 			break
 		
 
