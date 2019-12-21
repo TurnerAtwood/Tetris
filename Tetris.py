@@ -56,7 +56,9 @@ class Piece_Bag():
 
 class piece():
 	def __init__(self, index):
+		self.index = index
 		self.x = width//2
+		self.y = 0
 		self.grid = PIECE_INDEX[index]
 		self.width = len(self.grid[0])
 		self.move(0)
@@ -117,43 +119,40 @@ class Tetris_Engine():
 
 		self.bag = Piece_Bag()
 		self.active_piece = self.bag.next()
+		self.reset_coords()
 		self.next_piece = self.bag.next()
 		self.hold_piece = None
 		self.can_hold = True
 
 	### BOARD ###
-	def draw_piece(self,depth,ghost=False):
-		if not ghost:
-			sym = FULL_CHR
-		else:
-			sym = GHOST_CHR
+	# Draw the active piece onto the board (if valid)
 
+	def draw_piece(self, x, y, ghost=False):
+		if not self.position_valid(x, y, self.active_piece):
+			return False
+
+		if ghost:
+			sym = GHOST_CHR
+		else:
+			sym = FULL_CHR
 
 		new_board = deepcopy(self.board)
 		for i in range(len(self.active_piece.grid)):
 			for j in range(len(self.active_piece.grid[i])):
-				if self.active_piece.grid[i][j] == 0:
-					continue
-				y = depth + i
-				x = self.active_piece.x + j
-
-				# Maybe not the best way to do this
-				if new_board[y][x] == FULL_CHR:
-					raise RuntimeError
-
-				new_board[y][x] = sym
+				if self.active_piece.grid[i][j] == 1:
+					new_board[y+i][x+j] = sym
 		return new_board
 
 	# Return a new board with the dropped piece
 	def drop_piece(self,ghost=False):
-		# new_board = self.board
-		# for i in range(self.height):
-		for i in range(height):
-			try:
-				new_board = self.draw_piece(i, ghost)
-			except Exception as e:
+		new_board = self.board
+		for i in range(self.height):
+			if not self.position_valid(self.x, self.y+i, self.active_piece):
 				break
-		return new_board
+			new_board = self.draw_piece(self.x, self.y+i, ghost)
+		if new_board:
+			return new_board
+		raise Exception 
 
 
 	def clear_full_lines(self):
@@ -162,22 +161,75 @@ class Tetris_Engine():
 				del(self.board[index])
 				self.board.insert(0, deepcopy(EMPTY_LINE))
 				self.cleared += 1
+
+	# IOoB Error --> Clearly not valid
+	def position_valid(self, x, y, piece):
+		# Check left/right
+		if x < 0 or x > self.width - piece.width:
+			return False
+
+		# Check Height
+		if y < 0 or y > self.height - len(piece.grid):
+			return False
+
+		for i in range(len(piece.grid)):
+			for j in range(len(piece.grid[i])):
+				if piece.grid[i][j] == 0:
+					continue
+				if self.board[y+i][x+j] == FULL_CHR:
+					return False
+		return True
+
+	# Draw the board + ghost + active piece
+	# UPDATE THIS 
+	def draw_full_board(self):
+		ghost_board = self.drop_piece(ghost=True)
+		piece_board = self.draw_piece(self.x, self.y)
+		for i in range(self.height):
+			for j in range(self.width):
+				if piece_board[i][j] != ' ':
+					ghost_board[i][j] = piece_board[i][j]
+		return ghost_board
+
 	### BOARD ###
 
 	### PIECE ###
 
 	def move_piece_left(self):
-		self.active_piece.move(-1)
+		if self.position_valid(self.x - 1, self.y, self.active_piece):
+			self.x -= 1
 
 	def move_piece_right(self):
-		self.active_piece.move(1)
+		if self.position_valid(self.x + 1, self.y, self.active_piece):
+			self.x += 1
 
+	def move_piece_down(self):
+		if self.position_valid(self.x, self.y+1, self.active_piece):
+			self.y += 1
+
+
+	# NOTE - Very weird behavior when colliding
 	def rotate_piece(self):
-		self.active_piece.rotate()
+		active_piece_copy = deepcopy(self.active_piece)
+		active_piece_copy.rotate()
+		for i in range(active_piece_copy.width):
+			if self.position_valid(self.x+i, self.y, active_piece_copy):
+				self.active_piece = active_piece_copy
+				self.x += i
+				break
+			if self.position_valid(self.x-i, self.y, active_piece_copy):
+				self.active_piece = active_piece_copy
+				self.x -= i
+				break
 
 	def get_new_piece(self):
 		self.active_piece = self.next_piece
 		self.next_piece = self.bag.next()
+		self.reset_coords()
+
+	def reset_coords(self):
+		self.x = self.width//2
+		self.y = 0
 
 	def hard_drop(self):
 		self.can_hold = True
@@ -189,18 +241,21 @@ class Tetris_Engine():
 		if not self.can_hold:
 			return
 		self.can_hold = False
+
+		self.active_piece = piece(self.active_piece.index)
 		if self.hold_piece == None:
 			self.hold_piece = self.active_piece
 			self.get_new_piece()
 		else:
 			self.hold_piece, self.active_piece = self.active_piece, self.hold_piece
+		self.reset_coords()
 
 	### PIECE ###
 
 def print_screen(win, board):
 	# Print row by row
 	for i in range(height):
-		win.addstr(i,0, "".join([" "] + board[i]))
+		win.addstr(i+1,0, "".join([" "] + board[i]))
 	win.box()
 	win.refresh()
 
@@ -211,7 +266,7 @@ def main(stdscr):
 
 	game = Tetris_Engine()
 
-	board_win = curses.newwin(height+1, width+2, 0, 0)
+	board_win = curses.newwin(height+2, width+2, 0, 0)
 	stdscr.refresh()
 
 	next_piece_win = curses.newwin(6,6,1,12)
@@ -219,7 +274,7 @@ def main(stdscr):
 
 
 	while(True):
-		out_board = game.drop_piece(ghost=True)
+		out_board = game.draw_full_board()
 		print_screen(board_win, out_board)
 
 		next_piece_win.addstr(1,0, str(game.next_piece))
@@ -233,8 +288,10 @@ def main(stdscr):
 		stdscr.addstr(0,0,str(game.cleared))
 
 		key = stdscr.getch()
-		if key == curses.KEY_UP or key == curses.KEY_DOWN:
+		if key == curses.KEY_UP:
 			game.rotate_piece()
+		elif key == curses.KEY_DOWN:
+			game.move_piece_down()
 		elif key == curses.KEY_RIGHT:
 			game.move_piece_right()
 		elif key == curses.KEY_LEFT:
