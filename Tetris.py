@@ -8,6 +8,10 @@ from queue import deque
 from random import shuffle
 import curses
 
+# GAME CONSTANTS
+FPS = 60.0
+
+
 def print_screen(win, board):
 	# Print row by row
 	for i in range(height):
@@ -61,7 +65,7 @@ def main(stdscr):
 			game.hold()
 		elif key == ord('q'):
 			break
-		sleep(1/60.0)
+		sleep(1/FPS)
 
 
 if __name__ == "__main__":

@@ -8,7 +8,9 @@ from queue import deque
 from random import shuffle
 import curses
 
-KEYS = dict()
+# This global is modified by the listener callbacks
+#  The keyboard updates its active keys based on PASSED every tick
+PRESSED = set()
 
 def print_screen(win, board):
 	# Print row by row
@@ -21,31 +23,30 @@ def print_screen(win, board):
 
 # Callback for the listener
 def on_press(key):
-	global KEYS
+	global PRESSED
 	try:
 		key = key.char
 	except AttributeError:
 		key = str(key)
 
-	# What to do if key in KEYS?
-	if not key in KEYS:
-		KEYS[key] = 0
+	PRESSED.add(key)
 
 def on_release(key):
-	global KEYS
+	global PRESSED
 	try:
 		key = key.char
 	except AttributeError:
 		key = str(key)
 
-	if key in KEYS:
-		del(KEYS[key])
+	if key in PRESSED:
+		PRESSED.remove(key)
 
 
 class Tetris_Keyboard():
 	def __init__(self, engine):
 		self.engine = engine
 
+		self.keys = dict()
 		self.listener = None
 		self.start_listener()
 
@@ -61,54 +62,72 @@ class Tetris_Keyboard():
 			self.listener.join()
 			self.listener = None
 
-	# Reads key and makes calls to the engine
+	# Updates active keys and makes relevant calls to the engine
 	def tick(self):
-		global KEYS
-
 		self.engine.tick()
 
-		if 'q' in KEYS:
+		if 'q' in PRESSED:
 			return False
 
-		for key in KEYS:
-			KEYS[key] += 1
-			if (KEYS[key]%5 != 1):
-				continue
+		# Update self.keys with the data stored in PRESSED
+		for key in PRESSED:
+			if key not in self.keys:
+				self.keys[key] = 0
+		
+		remove = {i for i in self.keys if i not in PRESSED}
+		for key in remove:
+			del(self.keys[key])
 
+		# Take relevant actions for all active keys
+		for key in self.keys:
+			self.keys[key] += 1
 
 			if key == 'Key.up':
-				self.engine.rotate_piece()
+				if self.keys[key]%12 == 1:
+					self.engine.rotate_piece()
 			elif key == 'Key.down':
-				self.engine.move_piece_down()
+				if self.keys[key] == 1 or (self.keys[key] > 9 and self.keys[key]%3 == 1):
+					self.engine.move_piece_down()
 			elif key == 'Key.right':
-				self.engine.move_piece_right()
+				if self.keys[key] == 1 or (self.keys[key] > 7 and self.keys[key]%2 == 1):
+					self.engine.move_piece_right()
 			elif key == 'Key.left':
-				self.engine.move_piece_left()
+				if self.keys[key] == 1 or (self.keys[key] > 7 and self.keys[key]%2 == 1):
+					self.engine.move_piece_left()
 			elif key == 'Key.space':
-				self.engine.hard_drop()
-			elif key == ord('c'):
-				self.engine.hold()
+				if self.keys[key]%15 == 1:
+					self.engine.hard_drop()
+			elif key == 'c':
+				if self.keys[key] == 1:
+					self.engine.hold()
 		return True
 
 
 """ KEYBOARD CONTROLLER """
 
+keyboard = None
+
 def main(stdscr):
 	
-	game = Tetris_Engine()
-	keyboard = Tetris_Keyboard(game)
+	# game = Tetris_Engine()
+	# keyboard = Tetris_Keyboard(game)
+	global keyboard
 
 	curses.curs_set(False)
-	curses.noecho()
+	# curses.noecho()
 	stdscr.clear()
 
-	board_win = curses.newwin(height+2, width+2, 0, 0)
+	board_win = curses.newwin(height+2, width+2, 1, 0)
 	stdscr.refresh()
 
 	next_piece_win = curses.newwin(6,6,1,12)
 	hold_piece_win = curses.newwin(6,6,8,12)
 
+	stdscr.nodelay(True)
 	while(True):
+		# Trying to get curses to eat the keyboard inputs
+		stdscr.getch()
+
 		out_board = game.draw_full_board()
 		print_screen(board_win, out_board)
 
@@ -127,9 +146,12 @@ def main(stdscr):
 			break
 		sleep(1/60.0)
 
-	print("DYING")
+	stdscr.getch()
 	del(keyboard)
 
-
 if __name__ == "__main__":
+	# global keyboard
+	game = Tetris_Engine()
+	keyboard = Tetris_Keyboard(game) 
 	curses.wrapper(main)
+
