@@ -14,28 +14,18 @@ PIECE_INDEX = [
 
 NUM_PIECES = len(PIECE_INDEX)
 
-height = 20
-width = 10
-FULL_CHR = chr(int('2588',16))
-GHOST_CHR = chr(735)
-# FULL_CHR = '*'
-FULL_LINE  = [FULL_CHR for i in range(width)]
-EMPTY_LINE = [0 for i in range(width)]
-
-SORTED_BAG = [i%NUM_PIECES for i in range(NUM_PIECES)]
-
 class Piece_Bag():
 	def __init__(self):
 		self.bag = deque()
 		self.fill_bag()
 
 	def fill_bag(self):
-		clean_bag = deepcopy(SORTED_BAG)
+		clean_bag = list(range(NUM_PIECES))
 		shuffle(clean_bag)
 		self.bag.extend(clean_bag)
 
 	def next(self):
-		if len(self.bag) < 7:
+		if len(self.bag) < NUM_PIECES:
 			self.fill_bag()
 		new_piece_index = self.bag.popleft()
 		new_piece = piece(new_piece_index)
@@ -47,7 +37,7 @@ class piece():
 		self.grid = PIECE_INDEX[index]
 		self.width = len(self.grid[0])
 
-	# Rotate clockwise about the top-left corner
+	# Rotate clockwise
 	def rotate(self):
 		new_width = len(self.grid)
 		new_grid = [[0 for i in range(new_width)] for i in range(self.width)]
@@ -70,17 +60,6 @@ class piece():
 		self.grid = new_grid
 		self.width = new_width
 
-	# DEBUG - This always returns a 4x4 string. Is that an issue?
-	def __repr__(self):
-		out = [[' ' for j in range(4)] for i in range(4)]
-		for i in range(len(self.grid)):
-			for j in range(self.width):
-				if self.grid[i][j]:
-					out[i][j] = str(self.index + 1)
-
-		out = "\n".join(["".join(i) for i in out])
-		return out
-
 class Tetris_Engine():
 
 	def __init__(self, height=20, width=10):
@@ -97,13 +76,13 @@ class Tetris_Engine():
 		self.hold_piece = None
 		self.can_hold = True
 
-		# New drop mechanics
-		self.interval = 30
+		# The piece will drop every 30 ticks (made for 60 TPS)
+		self.drop_interval = 30
 		self.ticks_elapsed = 0
 
 	### BOARD ###
-	# Draw the active piece onto the board (if valid)
 
+	# Draw the active piece onto the board (if valid)
 	def draw_piece(self, x, y, ghost=False):
 		if not self.position_valid(x, y, self.active_piece):
 			return False
@@ -118,16 +97,14 @@ class Tetris_Engine():
 		return new_board
 
 	# Return a new board with the dropped piece
-	# DEBUG - Raise a better exception
+	# DEBUG - What if the current position is invalid?
 	def drop_piece(self,ghost=False):
 		new_board = self.board
 		for i in range(self.height):
 			if not self.position_valid(self.x, self.y+i, self.active_piece):
 				break
 			new_board = self.draw_piece(self.x, self.y+i, ghost)
-		if new_board:
-			return new_board
-		raise Exception
+		return new_board
 
 	def clear_full_lines(self):
 		for index in range(self.height):
@@ -137,16 +114,16 @@ class Tetris_Engine():
 				self.board.insert(0, deepcopy(self.empty_line))
 				self.cleared += 1
 
-	# IOoB Error --> Clearly not valid
 	def position_valid(self, x, y, piece):
-		# Check left/right
+		# Check width bounds
 		if x < 0 or x > self.width - piece.width:
 			return False
 
-		# Check Height
+		# Check height bounds
 		if y < 0 or y > self.height - len(piece.grid):
 			return False
 
+		# Check only the solid parts of the piece against the current board
 		for i in range(len(piece.grid)):
 			for j in range(len(piece.grid[i])):
 				if piece.grid[i][j] and self.board[y+i][x+j]:
@@ -196,6 +173,8 @@ class Tetris_Engine():
 	def rotate_piece(self):
 		active_piece_copy = deepcopy(self.active_piece)
 		active_piece_copy.rotate()
+		
+		# Try nearby positions if needed (sometimes no change will be made)
 		acceptable_distance = max(self.active_piece.width, len(self.active_piece.grid))
 		for i in range(acceptable_distance):
 			# Up
@@ -218,7 +197,6 @@ class Tetris_Engine():
 		self.active_piece = self.next_piece
 		self.next_piece = self.bag.next()
 		self.reset_coords()
-
 		self.ticks_elapsed = 0
 
 	def reset_coords(self):
@@ -248,9 +226,10 @@ class Tetris_Engine():
 
 	### GAMEPLAY ###
 	
+	# DEBUG - Maybe add in a delay to give the player a chance to move at the bottom
 	def tick(self):
 		self.ticks_elapsed += 1
-		if self.ticks_elapsed >= self.interval:
+		if self.ticks_elapsed >= self.drop_interval:
 			self.ticks_elapsed = 0
 			if not self.move_piece_down():
 				self.hard_drop()

@@ -1,12 +1,8 @@
 from Tetris_Engine import Tetris_Engine
 
-import pynput
-
 from time import sleep
-from copy import deepcopy
-from queue import deque
-from random import shuffle
 import curses
+import pynput
 
 FULL_CHR = chr(int('2588',16))
 HEIGHT = 20
@@ -29,7 +25,7 @@ def print_screen(win, board):
 			elif value < 10:
 				sym = FULL_CHR
 			else:
-				# attr = attr | curses.A_STANDOUT
+				attr = attr | curses.A_TOP
 				sym = "X"
 
 			win.addstr(i+1, j+1, sym, attr)
@@ -48,7 +44,7 @@ def format_piece(piece):
 
 """ KEYBOARD CONTROLLER """
 
-# Callback for the listener
+# Callbacks for the listener
 def on_press(key):
 	global PRESSED
 	try:
@@ -83,11 +79,14 @@ class Tetris_Keyboard():
 		self.listener = pynput.keyboard.Listener(on_press=on_press, on_release=on_release)
 		self.listener.start()
 
-	def __del__(self):
+	def stop_listener(self):
 		if not self.listener == None:
 			self.listener.stop()
 			self.listener.join()
 			self.listener = None
+
+	def __del__(self):
+		self.stop_listener()
 
 	# Updates active keys and makes relevant calls to the engine
 	def tick(self):
@@ -113,13 +112,13 @@ class Tetris_Keyboard():
 				if self.keys[key]%12 == 1:
 					self.engine.rotate_piece()
 			elif key == 'Key.down':
-				if self.keys[key] == 1 or (self.keys[key] > 9 and self.keys[key]%3 == 1):
+				if self.keys[key] == 1 or (self.keys[key] > 7 and self.keys[key]%3 == 1):
 					self.engine.move_piece_down()
 			elif key == 'Key.right':
-				if self.keys[key] == 1 or (self.keys[key] > 7 and self.keys[key]%2 == 1):
+				if self.keys[key] == 1 or (self.keys[key] > 6 and self.keys[key]%2 == 1):
 					self.engine.move_piece_right()
 			elif key == 'Key.left':
-				if self.keys[key] == 1 or (self.keys[key] > 7 and self.keys[key]%2 == 1):
+				if self.keys[key] == 1 or (self.keys[key] > 6 and self.keys[key]%2 == 1):
 					self.engine.move_piece_left()
 			elif key == 'Key.space':
 				if self.keys[key]%15 == 1:
@@ -137,6 +136,7 @@ def main(stdscr):
 	keyboard = Tetris_Keyboard(game)
 
 	curses.curs_set(False)
+	stdscr.nodelay(True)
 	stdscr.clear()
 
 	# COLOR PALATES FOR PIECES
@@ -148,26 +148,23 @@ def main(stdscr):
 	curses.init_pair(6, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
 	curses.init_pair(7, curses.COLOR_RED, curses.COLOR_BLACK)
 
+	# Initialize windows
 	board_win = curses.newwin(HEIGHT+2, WIDTH+2, 1, 0)
 	board_win.box()
-
 	next_piece_win = curses.newwin(6,6,1,12)
 	next_piece_win.box()
 	hold_piece_win = curses.newwin(6,6,8,12)
 	hold_piece_win.box()
 
-	stdscr.nodelay(True)
 	while(True):
-		# Trying to get curses to eat the keyboard inputs
+		# Have curses eat the inputs
 		stdscr.getch()
 
-		out_board = game.draw_full_board()
-		print_screen(board_win, out_board)
-
+		print_screen(board_win, game.draw_full_board())
 		print_screen(next_piece_win, format_piece(game.next_piece))
 		print_screen(hold_piece_win, format_piece(game.hold_piece))
 
-		stdscr.addstr(0,0,str(game.cleared))
+		stdscr.addstr(0, 0, "Cleared: " + str(game.cleared))
 
 		keep_going = keyboard.tick()
 		if not keep_going:
@@ -179,4 +176,3 @@ def main(stdscr):
 
 if __name__ == "__main__":
 	curses.wrapper(main)
-
