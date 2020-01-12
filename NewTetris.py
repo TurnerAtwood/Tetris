@@ -1,4 +1,4 @@
-from Tetris_Engine import Tetris_Engine,height,width
+from Tetris_Engine import Tetris_Engine
 
 import pynput
 
@@ -8,16 +8,43 @@ from queue import deque
 from random import shuffle
 import curses
 
+FULL_CHR = chr(int('2588',16))
+HEIGHT = 20
+WIDTH = 10
+
 # This global is modified by the listener callbacks
 #  The keyboard updates its active keys based on PASSED every tick
 PRESSED = set()
 
 def print_screen(win, board):
-	# Print row by row
+	height = len(board)
+	width = len(board[0])
 	for i in range(height):
-		win.addstr(i+1,0, "".join([" "] + board[i]))
-	win.box()
+
+		for j in range(width):
+			value = board[i][j]
+			attr = curses.color_pair(value%10)
+			if not value:
+				sym = " "
+			elif value < 10:
+				sym = FULL_CHR
+			else:
+				# attr = attr | curses.A_STANDOUT
+				sym = "X"
+
+			win.addstr(i+1, j+1, sym, attr)
+
 	win.refresh()
+
+def format_piece(piece):
+	result = [[0 for j in range(4)] for i in range(4)]
+	if piece == None:
+		return result
+
+	for i in range(len(piece.grid)):
+		for j in range(piece.width):
+			result[i][j] = piece.grid[i][j]
+	return result
 
 """ KEYBOARD CONTROLLER """
 
@@ -105,23 +132,29 @@ class Tetris_Keyboard():
 
 """ KEYBOARD CONTROLLER """
 
-keyboard = None
-
 def main(stdscr):
-	
-	# game = Tetris_Engine()
-	# keyboard = Tetris_Keyboard(game)
-	global keyboard
+	game = Tetris_Engine()
+	keyboard = Tetris_Keyboard(game)
 
 	curses.curs_set(False)
-	# curses.noecho()
 	stdscr.clear()
 
-	board_win = curses.newwin(height+2, width+2, 1, 0)
-	stdscr.refresh()
+	# COLOR PALATES FOR PIECES
+	curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_BLACK)
+	curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_BLACK)
+	curses.init_pair(3, curses.COLOR_BLUE, curses.COLOR_BLACK)
+	curses.init_pair(4, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+	curses.init_pair(5, curses.COLOR_GREEN, curses.COLOR_BLACK)
+	curses.init_pair(6, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
+	curses.init_pair(7, curses.COLOR_RED, curses.COLOR_BLACK)
+
+	board_win = curses.newwin(HEIGHT+2, WIDTH+2, 1, 0)
+	board_win.box()
 
 	next_piece_win = curses.newwin(6,6,1,12)
+	next_piece_win.box()
 	hold_piece_win = curses.newwin(6,6,8,12)
+	hold_piece_win.box()
 
 	stdscr.nodelay(True)
 	while(True):
@@ -131,13 +164,8 @@ def main(stdscr):
 		out_board = game.draw_full_board()
 		print_screen(board_win, out_board)
 
-		next_piece_win.addstr(1,0, str(game.next_piece))
-		next_piece_win.box()
-		next_piece_win.refresh()
-
-		hold_piece_win.addstr(1,0, str(game.hold_piece))
-		hold_piece_win.box()
-		hold_piece_win.refresh()
+		print_screen(next_piece_win, format_piece(game.next_piece))
+		print_screen(hold_piece_win, format_piece(game.hold_piece))
 
 		stdscr.addstr(0,0,str(game.cleared))
 
@@ -150,8 +178,5 @@ def main(stdscr):
 	del(keyboard)
 
 if __name__ == "__main__":
-	# global keyboard
-	game = Tetris_Engine()
-	keyboard = Tetris_Keyboard(game) 
 	curses.wrapper(main)
 

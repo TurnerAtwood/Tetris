@@ -5,12 +5,12 @@ from random import shuffle
 
 PIECE_INDEX = [
 	[[1,1,1,1]],
-	[[1,0,0],[1,1,1]],
-	[[0,0,1],[1,1,1]],
-	[[1,1],[1,1]],
-	[[0,1,1],[1,1,0]],
-	[[0,1,0],[1,1,1]],
-	[[1,1,0],[0,1,1]]]
+	[[2,0,0],[2,2,2]],
+	[[0,0,3],[3,3,3]],
+	[[4,4],[4,4]],
+	[[0,5,5],[5,5,0]],
+	[[0,6,0],[6,6,6]],
+	[[7,7,0],[0,7,7]]]
 
 NUM_PIECES = len(PIECE_INDEX)
 
@@ -20,7 +20,7 @@ FULL_CHR = chr(int('2588',16))
 GHOST_CHR = chr(735)
 # FULL_CHR = '*'
 FULL_LINE  = [FULL_CHR for i in range(width)]
-EMPTY_LINE = [' ' for i in range(width)]
+EMPTY_LINE = [0 for i in range(width)]
 
 SORTED_BAG = [i%NUM_PIECES for i in range(NUM_PIECES)]
 
@@ -56,7 +56,7 @@ class piece():
 		for i in range(len(self.grid)):
 			for j in range(self.width):
 				if self.grid[i][j]:
-					new_grid[j][i] = 1
+					new_grid[j][i] = self.index + 1
 
 		self.grid = new_grid
 		new_grid = [[0 for i in range(new_width)] for i in range(self.width)]
@@ -65,17 +65,19 @@ class piece():
 		for i in range(len(new_grid)):
 			for j in range(new_width):
 				if self.grid[i][j]:
-					new_grid[i][new_width-1-j] = 1
+					new_grid[i][new_width-1-j] = self.index + 1
 
 		self.grid = new_grid
 		self.width = new_width
 
+	# DEBUG - This always returns a 4x4 string. Is that an issue?
 	def __repr__(self):
-		out = [[' ' for j in range(5)] for i in range(4)]
+		out = [[' ' for j in range(4)] for i in range(4)]
 		for i in range(len(self.grid)):
 			for j in range(self.width):
 				if self.grid[i][j]:
-					out[i][j+1] = FULL_CHR
+					out[i][j] = str(self.index + 1)
+
 		out = "\n".join(["".join(i) for i in out])
 		return out
 
@@ -84,7 +86,7 @@ class Tetris_Engine():
 	def __init__(self, height=20, width=10):
 		self.height = height
 		self.width = width
-		self.empty_line = [' ' for i in range(self.width)]
+		self.empty_line = [0 for i in range(self.width)]
 		self.board = [deepcopy(self.empty_line) for i in range(self.height)]
 		self.cleared = 0
 
@@ -106,19 +108,17 @@ class Tetris_Engine():
 		if not self.position_valid(x, y, self.active_piece):
 			return False
 
-		if ghost:
-			sym = GHOST_CHR
-		else:
-			sym = FULL_CHR
-
 		new_board = deepcopy(self.board)
 		for i in range(len(self.active_piece.grid)):
 			for j in range(len(self.active_piece.grid[i])):
-				if self.active_piece.grid[i][j] == 1:
-					new_board[y+i][x+j] = sym
+				if self.active_piece.grid[i][j]:
+					new_board[y+i][x+j] = self.active_piece.grid[i][j]
+					if ghost:
+						new_board[y+i][x+j] += 10
 		return new_board
 
 	# Return a new board with the dropped piece
+	# DEBUG - Raise a better exception
 	def drop_piece(self,ghost=False):
 		new_board = self.board
 		for i in range(self.height):
@@ -127,14 +127,14 @@ class Tetris_Engine():
 			new_board = self.draw_piece(self.x, self.y+i, ghost)
 		if new_board:
 			return new_board
-		raise Exception 
-
+		raise Exception
 
 	def clear_full_lines(self):
 		for index in range(self.height):
-			if self.board[index] == FULL_LINE:
+			line = self.board[index]
+			if 0 not in line:
 				del(self.board[index])
-				self.board.insert(0, deepcopy(EMPTY_LINE))
+				self.board.insert(0, deepcopy(self.empty_line))
 				self.cleared += 1
 
 	# IOoB Error --> Clearly not valid
@@ -149,9 +149,7 @@ class Tetris_Engine():
 
 		for i in range(len(piece.grid)):
 			for j in range(len(piece.grid[i])):
-				if piece.grid[i][j] == 0:
-					continue
-				if self.board[y+i][x+j] == FULL_CHR:
+				if piece.grid[i][j] and self.board[y+i][x+j]:
 					return False
 		return True
 
@@ -159,9 +157,11 @@ class Tetris_Engine():
 	def draw_full_board(self):
 		ghost_board = self.drop_piece(ghost=True)
 		piece_board = self.draw_piece(self.x, self.y)
+
+		# Draw the piece board over the ghost board
 		for i in range(self.height):
 			for j in range(self.width):
-				if piece_board[i][j] != ' ':
+				if piece_board[i][j]:
 					ghost_board[i][j] = piece_board[i][j]
 		return ghost_board
 
@@ -192,15 +192,23 @@ class Tetris_Engine():
 
 
 	# NOTE - Very weird behavior when colliding
+	# DEBUG - This COULD result in teleporting through blocks
 	def rotate_piece(self):
 		active_piece_copy = deepcopy(self.active_piece)
 		active_piece_copy.rotate()
-		acceptable_distance = max(self.active_piece.width, active_piece_copy.width)
+		acceptable_distance = max(self.active_piece.width, len(self.active_piece.grid))
 		for i in range(acceptable_distance):
+			# Up
+			if self.position_valid(self.x, self.y-i, active_piece_copy):
+				self.active_piece = active_piece_copy
+				self.y -= i
+				break
+			# Right
 			if self.position_valid(self.x+i, self.y, active_piece_copy):
 				self.active_piece = active_piece_copy
 				self.x += i
 				break
+			# Left
 			if self.position_valid(self.x-i, self.y, active_piece_copy):
 				self.active_piece = active_piece_copy
 				self.x -= i
