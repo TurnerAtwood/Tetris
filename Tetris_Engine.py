@@ -60,6 +60,7 @@ class piece():
 		self.grid = new_grid
 		self.width = new_width
 
+# DEBUG - What shold happen when  the player loses?
 class Tetris_Engine():
 
 	def __init__(self, height=20, width=10):
@@ -79,6 +80,7 @@ class Tetris_Engine():
 		# The piece will drop every 30 ticks (made for 60 TPS)
 		self.drop_interval = 30
 		self.ticks_elapsed = 0
+		self.paused = False
 
 	### BOARD ###
 
@@ -147,21 +149,21 @@ class Tetris_Engine():
 	### PIECE ###
 
 	def move_piece_left(self):
-		if not self.position_valid(self.x - 1, self.y, self.active_piece):
+		if self.paused or not self.position_valid(self.x - 1, self.y, self.active_piece):
 			return False	
 
 		self.x -= 1
 		return True
 
 	def move_piece_right(self):
-		if not self.position_valid(self.x + 1, self.y, self.active_piece):
+		if self.paused or not self.position_valid(self.x + 1, self.y, self.active_piece):
 			return False
 		
 		self.x += 1
 		return True
 
 	def move_piece_down(self):
-		if not self.position_valid(self.x, self.y+1, self.active_piece):
+		if self.paused or not self.position_valid(self.x, self.y+1, self.active_piece):
 			return False
 		
 		self.y += 1
@@ -171,6 +173,8 @@ class Tetris_Engine():
 	# NOTE - Very weird behavior when colliding
 	# DEBUG - This COULD result in teleporting through blocks
 	def rotate_piece(self):
+		if self.paused:
+			return False
 		active_piece_copy = deepcopy(self.active_piece)
 		active_piece_copy.rotate()
 		
@@ -181,17 +185,18 @@ class Tetris_Engine():
 			if self.position_valid(self.x, self.y-i, active_piece_copy):
 				self.active_piece = active_piece_copy
 				self.y -= i
-				break
+				return True
 			# Right
 			if self.position_valid(self.x+i, self.y, active_piece_copy):
 				self.active_piece = active_piece_copy
 				self.x += i
-				break
+				return True
 			# Left
 			if self.position_valid(self.x-i, self.y, active_piece_copy):
 				self.active_piece = active_piece_copy
 				self.x -= i
-				break
+				return True
+		return False
 
 	def get_new_piece(self):
 		self.active_piece = self.next_piece
@@ -204,14 +209,17 @@ class Tetris_Engine():
 		self.y = 0
 
 	def hard_drop(self):
+		if self.paused:
+			return False
+
 		self.can_hold = True
 		self.board = self.drop_piece()
 		self.get_new_piece()
 		self.clear_full_lines()
 
 	def hold(self):
-		if not self.can_hold:
-			return
+		if self.paused or not self.can_hold:
+			return False
 		self.can_hold = False
 
 		self.active_piece = piece(self.active_piece.index)
@@ -221,6 +229,7 @@ class Tetris_Engine():
 		else:
 			self.hold_piece, self.active_piece = self.active_piece, self.hold_piece
 		self.reset_coords()
+		return True
 
 	### PIECE ###
 
@@ -228,10 +237,17 @@ class Tetris_Engine():
 	
 	# DEBUG - Maybe add in a delay to give the player a chance to move at the bottom
 	def tick(self):
+		if self.paused:
+			return False
+
 		self.ticks_elapsed += 1
 		if self.ticks_elapsed >= self.drop_interval:
 			self.ticks_elapsed = 0
 			if not self.move_piece_down():
 				self.hard_drop()
+		return True
+	
+	def pause_toggle(self):
+		self.paused = not self.paused
 
 	### GAMEPLAY ###

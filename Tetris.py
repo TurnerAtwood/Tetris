@@ -126,6 +126,9 @@ class Tetris_Keyboard():
 			elif key == 'c':
 				if self.keys[key] == 1:
 					self.engine.hold()
+			elif key == 'p':
+				if self.keys[key] == 1:
+					self.engine.pause_toggle()
 		return True
 
 
