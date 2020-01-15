@@ -1,4 +1,4 @@
-from time import sleep
+import time
 from copy import deepcopy
 from queue import deque
 from random import shuffle
@@ -81,6 +81,11 @@ class Tetris_Engine():
 		self.drop_interval = 30
 		self.ticks_elapsed = 0
 		self.paused = False
+		self.time_at_last_unpause = time.time()
+		self.total_time_past_segments = 0
+
+		# Rubber is the grace period (in ticks) for the active block hitting the bottom
+		self.rubber = 5
 
 	### BOARD ###
 
@@ -101,7 +106,7 @@ class Tetris_Engine():
 	# Return a new board with the dropped piece
 	# DEBUG - What if the current position is invalid?
 	def drop_piece(self,ghost=False):
-		new_board = self.board
+		new_board = False
 		for i in range(self.height):
 			if not self.position_valid(self.x, self.y+i, self.active_piece):
 				break
@@ -133,9 +138,12 @@ class Tetris_Engine():
 		return True
 
 	# Draw the board + ghost + active piece
+	# A failing board just 
 	def draw_full_board(self):
 		ghost_board = self.drop_piece(ghost=True)
 		piece_board = self.draw_piece(self.x, self.y)
+		if not ghost_board or not piece_board:
+			return self.board
 
 		# Draw the piece board over the ghost board
 		for i in range(self.height):
@@ -235,19 +243,35 @@ class Tetris_Engine():
 
 	### GAMEPLAY ###
 	
-	# DEBUG - Maybe add in a delay to give the player a chance to move at the bottom
 	def tick(self):
-		if self.paused:
+		if not self.position_valid(self.x, self.y, self.active_piece):
 			return False
+
+		if self.paused:
+			return True
 
 		self.ticks_elapsed += 1
 		if self.ticks_elapsed >= self.drop_interval:
-			self.ticks_elapsed = 0
-			if not self.move_piece_down():
+			if self.move_piece_down():
+				self.ticks_elapsed = 0
+			elif self.ticks_elapsed >= self.drop_interval + self.rubber:
 				self.hard_drop()
 		return True
 	
 	def pause_toggle(self):
+		current_time = time.time()
+		if self.paused:
+			self.time_at_last_unpause = current_time
+		else:
+			self.total_time_past_segments += (current_time - self.time_at_last_unpause)
 		self.paused = not self.paused
+
+
+	def time_elapsed(self):
+		if self.paused:
+			return self.total_time_past_segments
+		else:
+			current_time = time.time()
+			return self.total_time_past_segments + (current_time - self.time_at_last_unpause)
 
 	### GAMEPLAY ###

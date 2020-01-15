@@ -90,16 +90,17 @@ class Tetris_Keyboard():
 
 	# Updates active keys and makes relevant calls to the engine
 	def tick(self):
-		self.engine.tick()
-
-		if 'q' in PRESSED:
-			return False
-
-		# Update self.keys with the data stored in PRESSED
+		# Add all newly pressed keys to our active key dict
 		for key in PRESSED:
 			if key not in self.keys:
 				self.keys[key] = 0
-		
+
+		# Quit if 'p' is pressed or if the game ends
+		keep_going = self.engine.tick() and not 'q' in PRESSED
+		if not keep_going:
+			return False
+
+		# Remove all keys that have been released
 		remove = {i for i in self.keys if i not in PRESSED}
 		for key in remove:
 			del(self.keys[key])
@@ -115,13 +116,13 @@ class Tetris_Keyboard():
 				if self.keys[key] == 1 or (self.keys[key] > 7 and self.keys[key]%3 == 1):
 					self.engine.move_piece_down()
 			elif key == 'Key.right':
-				if self.keys[key] == 1 or (self.keys[key] > 6 and self.keys[key]%2 == 1):
+				if self.keys[key] == 1 or (self.keys[key] > 7 and self.keys[key]%2 == 1):
 					self.engine.move_piece_right()
 			elif key == 'Key.left':
-				if self.keys[key] == 1 or (self.keys[key] > 6 and self.keys[key]%2 == 1):
+				if self.keys[key] == 1 or (self.keys[key] > 7 and self.keys[key]%2 == 1):
 					self.engine.move_piece_left()
 			elif key == 'Key.space':
-				if self.keys[key]%15 == 1:
+				if self.keys[key] == 1 or (self.keys[key] > 12 and self.keys[key]%2 == 1):
 					self.engine.hard_drop()
 			elif key == 'c':
 				if self.keys[key] == 1:
@@ -152,7 +153,7 @@ def main(stdscr):
 	curses.init_pair(7, curses.COLOR_RED, curses.COLOR_BLACK)
 
 	# Initialize windows
-	board_win = curses.newwin(HEIGHT+2, WIDTH+2, 1, 0)
+	board_win = curses.newwin(HEIGHT+2, WIDTH+2, 2, 0)
 	board_win.box()
 	next_piece_win = curses.newwin(6,6,1,12)
 	next_piece_win.box()
@@ -168,6 +169,7 @@ def main(stdscr):
 		print_screen(hold_piece_win, format_piece(game.hold_piece))
 
 		stdscr.addstr(0, 0, "Cleared: " + str(game.cleared))
+		stdscr.addstr(1, 0, "Time: " + str(round(game.time_elapsed(), 3)))
 
 		keep_going = keyboard.tick()
 		if not keep_going:
