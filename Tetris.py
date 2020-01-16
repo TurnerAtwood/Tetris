@@ -109,9 +109,12 @@ class Tetris_Keyboard():
 		for key in self.keys:
 			self.keys[key] += 1
 
-			if key == 'Key.up':
+			if key == 'Key.up' or key == 'x':
 				if self.keys[key]%12 == 1:
 					self.engine.rotate_piece()
+			elif key == 'z':
+				if self.keys[key]%12 == 1:
+					self.engine.rotate_piece(clockwise = False)
 			elif key == 'Key.down':
 				if self.keys[key] == 1 or (self.keys[key] > 7 and self.keys[key]%3 == 1):
 					self.engine.move_piece_down()
@@ -155,9 +158,11 @@ def main(stdscr):
 	# Initialize windows
 	board_win = curses.newwin(HEIGHT+2, WIDTH+2, 2, 0)
 	board_win.box()
-	next_piece_win = curses.newwin(6,6,1,12)
+	stdscr.addstr(3,12, "Next:")
+	next_piece_win = curses.newwin(6,6,4,12)
 	next_piece_win.box()
-	hold_piece_win = curses.newwin(6,6,8,12)
+	stdscr.addstr(11,12, "Hold:")
+	hold_piece_win = curses.newwin(6,6,12,12)
 	hold_piece_win.box()
 
 	while(True):
@@ -169,7 +174,8 @@ def main(stdscr):
 		print_screen(hold_piece_win, format_piece(game.hold_piece))
 
 		stdscr.addstr(0, 0, "Cleared: " + str(game.cleared))
-		stdscr.addstr(1, 0, "Time: " + str(round(game.time_elapsed(), 3)))
+		time_ms = int(game.time_elapsed()*100)
+		stdscr.addstr(1, 0, "Time: " + f"{time_ms//6000:02d}:{(time_ms//100)%60:02d}:{time_ms%100:02d}")
 
 		keep_going = keyboard.tick()
 		if not keep_going:

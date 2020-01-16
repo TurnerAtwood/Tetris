@@ -138,7 +138,6 @@ class Tetris_Engine():
 		return True
 
 	# Draw the board + ghost + active piece
-	# A failing board just 
 	def draw_full_board(self):
 		ghost_board = self.drop_piece(ghost=True)
 		piece_board = self.draw_piece(self.x, self.y)
@@ -180,11 +179,15 @@ class Tetris_Engine():
 
 	# NOTE - Very weird behavior when colliding
 	# DEBUG - This COULD result in teleporting through blocks
-	def rotate_piece(self):
+	def rotate_piece(self, clockwise=True):
 		if self.paused:
 			return False
 		active_piece_copy = deepcopy(self.active_piece)
 		active_piece_copy.rotate()
+		if not clockwise:
+			active_piece_copy.rotate()
+			active_piece_copy.rotate()
+
 		
 		# Try nearby positions if needed (sometimes no change will be made)
 		acceptable_distance = max(self.active_piece.width, len(self.active_piece.grid))
