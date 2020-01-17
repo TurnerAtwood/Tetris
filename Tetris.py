@@ -42,6 +42,10 @@ def format_piece(piece):
 			result[i][j] = piece.grid[i][j]
 	return result
 
+def format_time(time_seconds):
+	time_ms = int(time_seconds*100)
+	return f"{time_ms//6000:02d}:{(time_ms//100)%60:02d}:{time_ms%100:02d}"
+
 """ KEYBOARD CONTROLLER """
 
 # Callbacks for the listener
@@ -174,8 +178,7 @@ def main(stdscr):
 		print_screen(hold_piece_win, format_piece(game.hold_piece))
 
 		stdscr.addstr(0, 0, "Cleared: " + str(game.cleared))
-		time_ms = int(game.time_elapsed()*100)
-		stdscr.addstr(1, 0, "Time: " + f"{time_ms//6000:02d}:{(time_ms//100)%60:02d}:{time_ms%100:02d}")
+		stdscr.addstr(1, 0, "Time: " + format_time(game.time_elapsed()))
 
 		keep_going = keyboard.tick()
 		if not keep_going:
@@ -185,5 +188,7 @@ def main(stdscr):
 	stdscr.getch()
 	del(keyboard)
 
+	return f"Cleared {game.cleared} lines in {format_time(game.time_elapsed())}!"
+
 if __name__ == "__main__":
-	curses.wrapper(main)
+	print(curses.wrapper(main))
