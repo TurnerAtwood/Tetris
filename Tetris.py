@@ -143,7 +143,7 @@ class Tetris_Keyboard():
 """ KEYBOARD CONTROLLER """
 
 def main(stdscr):
-	game = Tetris_Engine()
+	game = Tetris_Engine(game_mode=0)
 	keyboard = Tetris_Keyboard(game)
 
 	curses.curs_set(False)

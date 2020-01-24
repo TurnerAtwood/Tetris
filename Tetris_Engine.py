@@ -1,7 +1,7 @@
 import time
 from copy import deepcopy
 from queue import deque
-from random import shuffle
+from random import shuffle, randint
 
 PIECE_INDEX = [
 	[[1,1,1,1]],
@@ -60,10 +60,9 @@ class piece():
 		self.grid = new_grid
 		self.width = new_width
 
-# DEBUG - What shold happen when  the player loses?
 class Tetris_Engine():
 
-	def __init__(self, height=20, width=10):
+	def __init__(self, height=20, width=10, game_mode=0):
 		self.height = height
 		self.width = width
 		self.empty_line = [0 for i in range(self.width)]
@@ -86,6 +85,16 @@ class Tetris_Engine():
 
 		# Rubber is the grace period (in ticks) for the active block hitting the bottom
 		self.rubber = 5
+
+		# Game mode variables
+		# (0, Sprint), (1, Marathon), (2, Cheese Race)
+		self.game_mode = game_mode
+		self.original_drop_interval = self.drop_interval
+		self.cheese_line = [8 for i in range(self.width)]
+		self.cheese_height = 8
+		self.cheese_left = 20
+		if game_mode == 2:
+			self.cheese_init()
 
 	### BOARD ###
 
@@ -118,8 +127,31 @@ class Tetris_Engine():
 			line = self.board[index]
 			if 0 not in line:
 				del(self.board[index])
-				self.board.insert(0, deepcopy(self.empty_line))
 				self.cleared += 1
+
+				# Normal line replacement (blank line at the top)
+				if self.game_mode != 2 or self.cheese_left == 0 or index < self.height - self.cheese_height:
+					self.board.insert(0, deepcopy(self.empty_line))
+
+					# Cheese height needs to go to zero when there is none left on the board
+					if self.game_mode == 2 and self.cheese_left == 0:
+						self.cheese_height = min(self.cheese_height, self.height - index - 1)
+				
+				# Cheese race line replacement (new cheese at the bottom)
+				else:
+					self.board.insert(-1, self.make_cheese_line())
+					# Cheese left is zero when we are done putting it on the board
+					self.cheese_left = max(0, self.cheese_left - 1)
+					
+
+		# MARATHON SPEEDUP (speed up every 10 lines)
+		if (self.game_mode == 1):
+			if (self.cleared < 120):
+				self.drop_interval = max(4, self.original_drop_interval - 3 * (self.cleared//10))
+			elif (self.cleared < 150):
+				self.drop_interval = 3
+			else:
+				self.drop_interval = 2
 
 	def position_valid(self, x, y, piece):
 		# Check width bounds
@@ -221,7 +253,7 @@ class Tetris_Engine():
 
 	def hard_drop(self):
 		if self.paused:
-			return False
+			return True
 
 		self.can_hold = True
 		self.board = self.drop_piece()
@@ -247,7 +279,16 @@ class Tetris_Engine():
 	### GAMEPLAY ###
 	
 	def tick(self):
+		# The active piece can only be invalid on spawn, so this is game over
 		if not self.position_valid(self.x, self.y, self.active_piece):
+			return False
+
+		# Sprint ends at 40 lines
+		if self.game_mode == 0 and self.cleared >= 40:
+			return False
+
+		# Cheese race ends when the cheese_height hits 0
+		if self.cheese_height == 0:
 			return False
 
 		if self.paused:
@@ -269,12 +310,27 @@ class Tetris_Engine():
 			self.total_time_past_segments += (current_time - self.time_at_last_unpause)
 		self.paused = not self.paused
 
-
 	def time_elapsed(self):
 		if self.paused:
 			return self.total_time_past_segments
 		else:
 			current_time = time.time()
 			return self.total_time_past_segments + (current_time - self.time_at_last_unpause)
+
+	# Fill the (empty) board with cheese up to the cheese
+	def cheese_init(self):
+		for i in range(-1,-1*self.cheese_height-1, -1):
+			if self.cheese_left > 0:
+				self.board[i] = self.make_cheese_line()
+				self.cheese_left -= 1
+			else:
+				break
+
+	# Return a line with one (1) random empty spot
+	def make_cheese_line(self):
+		cheese_line = [1 for i in range(self.width)]
+		blank_spot = randint(0, self.width-1)
+		cheese_line[blank_spot] = 0
+		return cheese_line
 
 	### GAMEPLAY ###
